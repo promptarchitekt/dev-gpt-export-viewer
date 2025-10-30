@@ -790,7 +790,7 @@ fbSend?.addEventListener('click', async ()=>{
     const clarity = requireVal('rateClarity');
     const func = requireVal('rateFunction');
     const structure = requireVal('rateStructure');
-    const helpful = fbForm.querySelector('select[name="helpful"]').value;
+    const helpful = Array.from(fbForm.querySelectorAll("input[name=\"helpful\"]:checked")).map(e=>e.value);
     const comment = fbForm.querySelector('textarea[name="comment"]').value || '';
     const consent = document.getElementById('fbConsent').checked;
     const honey = fbForm.querySelector('input[name="_hp"]').value;
@@ -810,5 +810,6 @@ fbSend?.addEventListener('click', async ()=>{
 });
 
 </script>
+
 
 
