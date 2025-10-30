@@ -11,12 +11,13 @@ export default async function handler(req, res) {
     }
     // Compose issue payload
     const title = `[Feedback] ${app || 'app'} v${version || '0.0.0'} – ${new Date(time || Date.now()).toISOString()}`;
+    const helpfulText = Array.isArray(helpful) ? helpful.join(', ') : (helpful || '-') ;
     const body = [
       `Overall: ${overall}/10`,
       `Clarity: ${clarity}/10`,
       `Functionality: ${functionality}/10`,
       `Structure: ${structure}/10`,
-      `Helpful: ${helpful || '-'}`,
+      `Helpful: `,
       '',
       'Comment:',
       comment || '(none)',
@@ -51,3 +52,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'server_error', details: String(e) });
   }
 }
+
