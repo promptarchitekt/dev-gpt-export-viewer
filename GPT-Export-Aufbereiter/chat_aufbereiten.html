@@ -82,6 +82,7 @@
       <div class="row">
         <button id="pickFile" class="primary" title="Quelle wählen: Datei conversations.json aus dem entzippten GPT‑Export (meist Downloads)">Quelle wählen</button>
         <span id="fileInfo" class="srcHint"><b>Quelle</b>: Die Datei <b>conversations.json</b> liegt direkt im entzippten GPT‑Export‑Ordner (häufig im Ordner „Downloads“).</span>
+        <input id="fileFallback" type="file" accept="application/json" style="display:none" />
       </div>
       <div class="row">
         <button id="pickDir">Zielordner wählen</button>
@@ -200,6 +201,7 @@ const bom = "\ufeff"; // UTF-8 BOM
 const pickFileBtn = $('#pickFile');
 const pickDirBtn = $('#pickDir');
 const fileInfo = $('#fileInfo');
+const fileFallbackInput = document.getElementById('fileFallback');
 const dirInfo = $('#dirInfo');
 const partSizeSel = $('#partSize');
 const makeIndex = $('#makeIndex');
@@ -230,6 +232,7 @@ const helpClose = document.getElementById('helpClose');
 
 // Zustände
 let fileHandle = null;
+let sourceFile = null; // Fallback-Dateiobjekt, wenn showOpenFilePicker fehlt
 let outDirHandle = null;
 let viewDirHandle = null;
 let indexRows = [];
@@ -285,20 +288,43 @@ function textFromContent(content){
 // Datei- und Ordnerwahl
 pickFileBtn.addEventListener('click', async ()=>{
   try{
-    const [h] = await showOpenFilePicker({ startIn:'downloads', types:[{description:'conversations.json', accept:{'application/json':['.json']}}] });
-    const f = await h.getFile();
-    const name = (f.name||'').toLowerCase();
-    if(!name.endsWith('conversations.json')){
-      const ok = confirm(`Gewählte Datei ist "${f.name}". Erwartet wird conversations.json. Fortfahren?`);
-      if(!ok) return;
+    if (typeof window.showOpenFilePicker === 'function'){
+      const [h] = await showOpenFilePicker({ startIn:'downloads', types:[{description:'conversations.json', accept:{'application/json':['.json']}}] });
+      const f = await h.getFile();
+      const name = (f.name||'').toLowerCase();
+      if(!name.endsWith('conversations.json')){
+        const ok = confirm(`Gewählte Datei ist "${f.name}". Erwartet wird conversations.json. Fortfahren?`);
+        if(!ok) return;
+      }
+      fileHandle = h; sourceFile = f;
+      fileInfo.textContent = `${f.name} – ${(f.size/1_000_000).toFixed(1)} MB (Quelle: Datei)`;
+    } else {
+      // Fallback über verstecktes <input type="file">
+      fileFallbackInput.value = '';
+      fileFallbackInput.click();
     }
-    fileHandle = h;
-    fileInfo.textContent = `${f.name} – ${(f.size/1_000_000).toFixed(1)} MB (Quelle: Datei)`;
   }catch(e){ if(e?.name!=='AbortError') alert('Dateiauswahl fehlgeschlagen: '+e); }
+});
+
+// Fallback: wenn showOpenFilePicker fehlt
+fileFallbackInput?.addEventListener('change', ()=>{
+  const f = fileFallbackInput.files?.[0];
+  if(!f) return;
+  const name = (f.name||'').toLowerCase();
+  if(!name.endsWith('conversations.json')){
+    const ok = confirm(`Gewählte Datei ist "${f.name}". Erwartet wird conversations.json. Fortfahren?`);
+    if(!ok) return;
+  }
+  sourceFile = f; fileHandle = null;
+  fileInfo.textContent = `${f.name} – ${(f.size/1_000_000).toFixed(1)} MB (Quelle: Datei)`;
 });
 
 pickDirBtn.addEventListener('click', async ()=>{
   try{
+    if (typeof window.showDirectoryPicker !== 'function'){
+      alert('Ihr Browser unterstützt keinen Ordnerzugriff (showDirectoryPicker). Bitte verwenden Sie Chrome oder Edge für die Aufbereitung. Export funktioniert ansonsten über Download‑Fallback.');
+      return;
+    }
     const opts = {};
     try{ if(fileHandle) opts.startIn = fileHandle; else opts.startIn = 'downloads'; }catch{}
     outDirHandle = await window.showDirectoryPicker(opts);
@@ -356,7 +382,7 @@ startBtn.addEventListener('click', async ()=>{
   if(msgOut){ msgW = await msgOut.createWritable(); await msgW.write(bom + 'conversation_id,title,time,role,text\n'); }
 
   // Streaming-Parser
-  const file = await fileHandle.getFile();
+  const file = sourceFile ? sourceFile : await fileHandle.getFile();
   const reader = file.stream().getReader();
   const dec = new TextDecoder('utf-8');
   let buf = '';
