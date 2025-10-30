@@ -66,6 +66,10 @@
   .fbGroup input[type="radio"]{accent-color:#0b57d0}
   .fbActions{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
   .fbInput, .fbSelect{padding:8px 10px; border:1px solid #c9d1dc; border-radius:6px; flex:1}
+  /* 5-Punkte-Skala mit Endlabels */
+  .fbScale{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .fbScale .scaleLabel{color:#555; font-size:12px; white-space:nowrap}
+  .fbScale label{margin:0 2px}
   .meta{padding:12px 16px;border-bottom:1px solid #d5dde7;background:#fafbfc}
   .meta .row{display:flex;gap:12px;align-items:center;flex-wrap:nowrap}
   #chatTitle{flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -774,6 +778,9 @@ if(fbBtn && fbModal && fbClose){
 
 function buildRating(id){
   const host = document.getElementById(id); if(!host || host.childElementCount) return;
+  host.classList.add('fbScale');
+  const left = document.createElement('span'); left.className = 'scaleLabel'; left.textContent = 'Nicht so gut';
+  host.appendChild(left);
   for(let i=1;i<=5;i++){
     const lbl=document.createElement('label');
     lbl.style.display='inline-flex'; lbl.style.alignItems='center'; lbl.style.gap='4px';
@@ -781,6 +788,8 @@ function buildRating(id){
     lbl.appendChild(r); lbl.appendChild(document.createTextNode(String(i)));
     host.appendChild(lbl);
   }
+  const right = document.createElement('span'); right.className = 'scaleLabel'; right.textContent = 'Da will ich mehr von!';
+  host.appendChild(right);
 }
 
 fbSend?.addEventListener('click', async ()=>{
