@@ -1,0 +1,656 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>GPT‑Export Aufbereiter</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--bd:#e3e6ea;--pri:#0b57d0;--accent:#188038}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg)}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--bd);padding:12px 16px;z-index:10}
+  h1{font-size:18px;margin:0}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid #c9d1dc;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  details.card{padding:0; overflow:hidden; border-radius:10px}
+  details.card>summary{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #d5dde7;cursor:pointer;list-style:none;background:#f8fafc; border-top-left-radius:10px; border-top-right-radius:10px; user-select:none; caret-color:transparent}
+  details.card>summary .caret{display:inline-block;transform:rotate(0deg);transition:transform .15s ease;color:var(--accent);font-weight:700}
+  details[open].card>summary .caret{transform:rotate(90deg)}
+  details.card>div{padding:12px 16px}
+  /* Hilfe-Dialog: FAQ-Überschriften ohne Textauswahl/Cursor */
+  #helpModal details>summary{user-select:none; caret-color:transparent}
+  /* Hilfe-Button sichtbar grün und fett */
+  #helpBtn{background:var(--accent); color:#fff; border:1px solid var(--accent); font-weight:700; border-radius:6px; padding:6px 10px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+  .note{color:#666;font-size:12px}
+  .hint{color:#444;font-size:13px}
+  .srcHint{color:#444; font-size:inherit}
+  label{display:inline-flex;gap:6px;align-items:center}
+  select,input[type="checkbox"],input[type="text"],button{font:inherit}
+  input[type="text"],select{padding:8px 10px;border:1px solid #c9d1dc;border-radius:6px;background:#fff}
+  input[type="text"]:focus, select:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(11,87,208,.12)}
+  button{border:1px solid #c9d1dc;background:#fff;border-radius:6px;padding:8px 12px;cursor:pointer}
+  button.primary{background:var(--pri);color:#fff;border-color:var(--pri)}
+  .btn-ghost{background:#fff;border:1px solid #c9d1dc;color:#222}
+  button.good{background:#188038;color:#fff;border-color:#188038}
+  button.warn{background:#c5221f;color:#fff;border-color:#c5221f}
+  progress{width:240px;height:12px}
+  .cols{display:grid;grid-template-columns:340px 1fr;gap:16px; height:calc(100vh - 220px)}
+  /* Verhindert, dass die rechte Spalte übersteht (Grid-Item Standard min-width:auto) */
+  .rightPane{display:flex;flex-direction:column; height:100%; min-width:0}
+  .chat{background:#fff;border:1px solid #c9d1dc;border-radius:8px; height:100%; display:flex; flex-direction:column; overflow:hidden; min-width:0; max-width:100%;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .bubble{flex:1;background:#fff;border:1px solid #d5dde7;border-radius:8px;padding:10px;white-space:pre-wrap; overflow-wrap:anywhere}
+  .list{background:#fff;border:1px solid #c9d1dc;border-radius:8px;overflow:hidden;min-height:320px; height:100%; display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .list header{position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #d5dde7;padding:8px 12px;z-index:1}
+  #listBody{overflow:auto; flex:1 1 auto}
+  .item{padding:10px 12px;border-top:1px solid var(--bd);cursor:pointer}
+  .item:hover{background:#f2f6ff}
+  .item .t{font-weight:600}
+  .item .s{font-size:12px;color:#666;margin-top:2px}
+  /* Toolbar rechts über dem Chat */
+  .rightBar{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  #chatSearch{flex:0 0 50%; min-width:240px; padding:8px 10px; border:1px solid #c9d1dc; border-radius:6px}
+  /* Nach-oben-Schalter */
+  #backToTop{position:fixed; right:20px; bottom:20px; display:none; border:1px solid #188038; background:#188038; color:#fff; border-radius:20px; padding:8px 12px; box-shadow:0 2px 8px rgba(0,0,0,.12); cursor:pointer}
+  #hitNav{position:fixed; right:20px; bottom:64px; display:none; gap:6px}
+  #hitNav button{border:1px solid #188038; background:#188038; color:#fff; border-radius:20px; padding:8px 10px; cursor:pointer}
+  .meta{padding:12px 16px;border-bottom:1px solid #d5dde7;background:#fafbfc}
+  .meta .row{display:flex;gap:12px;align-items:center;flex-wrap:nowrap}
+  #chatTitle{flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .meta input[type="text"]{padding:6px 8px;border:1px solid #c9d1dc;border-radius:6px;min-width:220px}
+  .meta .searchNav{display:flex;gap:6px;align-items:center}
+  .meta .searchNav button{padding:6px 8px}
+  mark{background:#ffe58a;padding:0 2px}
+  .msgs{padding:12px 16px; overflow:auto; flex:1 1 auto}
+  .msg{margin:10px 0;display:flex;gap:12px}
+  .role{width:120px;flex:0 0 120px;color:#555;font-weight:600}
+  .assistant .bubble{background:#f0f7ff;border-color:#cfe3ff}
+  .nontext .bubble{background:#fafafa;border-style:dashed;color:#555}
+  .time{color:#888;font-size:11px;margin-bottom:6px}
+  .empty{padding:12px;color:#666}
+</style>
+<header>
+  <div class="wrap">
+    <h1>GPT‑Export Aufbereiter</h1>
+  </div>
+</header>
+
+<div class="wrap">
+  <details class="card" id="prepDetails" open>
+    <summary>
+      <span class="caret">▶</span>
+      <h2 style="margin:0; flex:1">Schritt 1: Aufbereiten</h2>
+      <button id="helpBtn" class="btn-ghost" title="Kurzanleitung" aria-label="Hilfe">?</button>
+    </summary>
+    <div id="prep">
+      <div class="row">
+        <button id="pickFile" class="primary" title="Quelle wählen: Datei conversations.json aus dem entzippten GPT‑Export (meist Downloads)">Quelle wählen</button>
+        <span id="fileInfo" class="srcHint"><b>Quelle</b>: Die Datei <b>conversations.json</b> liegt direkt im entzippten GPT‑Export‑Ordner (häufig im Ordner „Downloads“).</span>
+      </div>
+      <div class="row">
+        <button id="pickDir">Zielordner wählen</button>
+        <span class="srcHint" id="dirInfo"><b>Zielordner</b>: Erstelle oder wähle einen bestehenden Ordner, in dem die Aufbereitung der <b>conversations.json</b> erfolgt.</span>
+      </div>
+      <div class="row">
+        <label title="20 MB: Weniger Dateien, schnelleres Navigieren. 10 MB: maximal stabil auf sehr alten PCs.">Teilgröße:
+          <select id="partSize">
+            <option value="10485760">10 MB – sehr stabil, mehr Dateien</option>
+            <option value="20971520" selected>20 MB – guter Mittelweg (Empfehlung)</option>
+            <option value="52428800">50 MB – weniger Dateien, erfordert mehr Arbeitsspeicher</option>
+          </select>
+        </label>
+        <label title="Erzeugt eine Übersicht je Konversation (für Excel)"><input type="checkbox" id="makeIndex" checked> index.csv erzeugen</label>
+        <label title="Alle Nachrichten tabellarisch (kann groß werden)"><input type="checkbox" id="makeMessages" checked> messages.csv erzeugen</label>
+      </div>
+      <div class="row">
+        <button id="start" class="primary">Aufbereitung starten</button>
+        <button id="openPrepared" title="Nach der Aufbereitung direkt anzeigen" disabled>Aufbereitungsordner öffnen</button>
+        <progress id="prog" max="100" value="0" hidden></progress>
+        <span id="status" class="hint"></span>
+      </div>
+      <div class="note">Hinweis: Alles passiert lokal im Browser. Es wird nichts hochgeladen. Bitte Chrome oder Edge verwenden.</div>
+    </div>
+  </details>
+
+  <div style="height:12px"></div>
+
+  <div class="card">
+    <h2>Schritt 2: Quelle anzeigen</h2>
+    <div class="row">
+      <button id="openRemembered" class="primary" title="Öffnet die zuletzt verwendete Quelle">Quelle öffnen</button>
+      <button id="changeSource">Quelle ändern</button>
+      <span id="listInfo" class="hint"></span>
+    </div>
+  <div class="cols" id="cols">
+      <div class="list">
+        <header>
+          <div class="hint">Konversationen (aus index.csv)</div>
+          <input id="listSearch" type="text" placeholder="In Liste suchen" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid var(--bd);border-radius:6px">
+        </header>
+        <div id="listBody"><div class="empty">Bitte Ordner wählen.</div></div>
+      </div>
+      <div class="rightPane">
+        <div class="rightBar">
+          <input id="chatSearch" type="text" placeholder="Im Chat suchen (Enter = nächster)">
+          <button id="exportChatTop" title="Aktuellen Chat exportieren">Export</button>
+          <label title="Format für den Chat-Export">
+            <select id="exportFormatTop">
+              <option value="html" selected>HTML</option>
+              <option value="md">Markdown (.md)</option>
+              <option value="txt">Text (.txt)</option>
+            </select>
+          </label>
+        </div>
+        <div class="chat">
+          <div class="meta" id="chatMeta">
+            <div class="row">
+              <div id="chatTitle">Keine Auswahl.</div>
+              <div class="searchNav">
+                <button id="prevHit" title="Vorheriger Treffer">◀</button>
+                <button id="nextHit" title="Nächster Treffer">▶</button>
+                <span id="hitInfo" class="hint">0/0 Treffer</span>
+              </div>
+              <label><input type="checkbox" id="showTech"> Technische Einträge</label>
+            </div>
+          </div>
+          <div class="msgs" id="chatMsgs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="backToTop" title="Nach oben">Nach oben</button>
+<div id="hitNav"><button id="prevHitFloat" title="Vorheriger Treffer">◀</button><button id="nextHitFloat" title="Nächster Treffer">▶</button></div>
+
+<!-- Hilfe-Modal -->
+<div id="helpModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:1000">
+  <div style="background:#fff;max-width:840px;width:92%;border:1px solid #c9d1dc;border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.16);padding:16px">
+    <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+      <h3 style="margin:0">Kurzanleitung</h3>
+      <button id="helpClose" class="btn-ghost">Schließen</button>
+    </div>
+    <div style="margin-top:10px;line-height:1.5">
+      <p style="margin:6px 0"><b>Ablauf in 4 Schritten</b></p>
+      <ul style="margin:0 0 10px 18px">
+        <li>Quelle: <b>conversations.json wählen</b> (Downloads)</li>
+        <li>Ziel: <b>Zielordner wählen</b> (App erstellt Ordner „Aufbereitung“)</li>
+        <li>Einstellungen: Teilgröße 20 MB (Empfehlung), CSV‑Häkchen</li>
+        <li>Start: <b>Aufbereitung starten</b> → <b>Aufbereitungsordner öffnen</b></li>
+      </ul>
+      <p style="margin:6px 0"><b>Hinweise</b></p>
+      <ul style="margin:0 0 14px 18px">
+        <li>Alles lokal im Browser, kein Upload.</li>
+        <li>Export: „Speichern unter“ mit vorgeschlagenem Namen.</li>
+      </ul>
+      <p style="margin:6px 0"><b>FAQ</b></p>
+      <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px;margin-bottom:6px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Keine conversations.json gefunden?</summary><div style="margin-top:6px">Bitte ZIP vorher entpacken und die Datei <b>conversations.json</b> im Export‑Ordner über <b>conversations.json wählen</b> auswählen.</div></details>
+      <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px;margin-bottom:6px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Zugriff verweigert?</summary><div style="margin-top:6px">Dateizugriff erlauben oder den Zielordner erneut über <b>Zielordner wählen</b> auswählen.</div></details>
+      <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px;margin-bottom:6px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Sehr großer Export?</summary><div style="margin-top:6px">Teilgröße 20 MB beibehalten; Fortschritt abwarten, Tab aktiv lassen. Bei Bedarf 10 MB wählen.</div></details>
+      <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px;margin-bottom:6px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Umlaute/Excel?</summary><div style="margin-top:6px">CSVs sind UTF‑8 mit BOM; sehr große Dateien laden in Excel langsamer.</div></details>
+      <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Exporte</summary><div style="margin-top:6px">Einzelexporte werden im Ordner <b>Exporte</b> gespeichert. Formate: <b>HTML</b>, <b>Markdown (.md)</b>, <b>Text (.txt)</b>.</div></details>
+    </div>
+  </div>
+</div>
+
+<script>
+// Utilitys
+const $ = sel => document.querySelector(sel);
+const fmt = new Intl.DateTimeFormat(undefined, {hour12:false, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+const toLocalIso = (sec) => { try{ const d=new Date(sec*1000); const off = -d.getTimezoneOffset(); const sign = off>=0?'+':'-'; const hh=String(Math.trunc(Math.abs(off)/60)).padStart(2,'0'); const mm=String(Math.abs(off)%60).padStart(2,'0'); return d.toISOString().replace('Z', sign+hh+':'+mm);}catch{return ''} };
+const bom = "\ufeff"; // UTF-8 BOM
+
+// Elemente
+const pickFileBtn = $('#pickFile');
+const pickDirBtn = $('#pickDir');
+const fileInfo = $('#fileInfo');
+const dirInfo = $('#dirInfo');
+const partSizeSel = $('#partSize');
+const makeIndex = $('#makeIndex');
+const makeMessages = $('#makeMessages');
+const startBtn = $('#start');
+const prog = $('#prog');
+const statusEl = $('#status');
+
+const openPreparedBtn = $('#openPrepared');
+const openRememberedBtn = $('#openRemembered');
+const changeSourceBtn = $('#changeSource');
+const backToTopBtn = document.getElementById('backToTop');
+const listSearch = document.getElementById('listSearch');
+const listBody = $('#listBody');
+const listInfo = $('#listInfo');
+const chatTitleEl = $('#chatTitle');
+const chatMsgs = $('#chatMsgs');
+const chatSearch = $('#chatSearch');
+const prevHit = $('#prevHit');
+const nextHit = $('#nextHit');
+const hitInfo = $('#hitInfo');
+const showTechEl = $('#showTech');
+const exportChatTopBtn = $('#exportChatTop');
+const exportFormatTopSel = document.getElementById('exportFormatTop');
+const helpBtn = document.getElementById('helpBtn');
+const helpModal = document.getElementById('helpModal');
+const helpClose = document.getElementById('helpClose');
+
+// Zustände
+let fileHandle = null;
+let outDirHandle = null;
+let viewDirHandle = null;
+let indexRows = [];
+let currentMessages = [];
+let currentConvId = '';
+let currentPart = '';
+let currentTitle = '';
+let matchNodes = [];
+let matchIndex = 0;
+
+function setStatus(t){ statusEl.textContent = t || ''; }
+
+// Kleine Speicherung der zuletzt genutzten Quelle (IndexedDB)
+const DB_NAME='gpt-export-db';
+const DB_STORE='handles';
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=()=>{ r.result.createObjectStore(DB_STORE); };
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+async function dbPut(key, val){ const db=await openDB(); return new Promise((res,rej)=>{ const tx=db.transaction(DB_STORE,'readwrite'); tx.objectStore(DB_STORE).put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+async function dbGet(key){ const db=await openDB(); return new Promise((res,rej)=>{ const tx=db.transaction(DB_STORE,'readonly'); const rq=tx.objectStore(DB_STORE).get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+
+function updateSourceButton(hasSource){
+  if(hasSource){
+    openRememberedBtn.classList.remove('warn');
+    openRememberedBtn.classList.add('good');
+    openRememberedBtn.textContent = 'Quelle öffnen (gemerkt)';
+  }else{
+    openRememberedBtn.classList.remove('good');
+    openRememberedBtn.classList.add('warn');
+    openRememberedBtn.textContent = 'Quelle öffnen (wählen)';
+  }
+}
+
+// Text aus variablen Content-Strukturen extrahieren (global nutzbar)
+function textFromContent(content){
+  if(content==null) return '';
+  if(Array.isArray(content)){
+    const t=[]; for(const p of content){ if(typeof p==='string') t.push(p); else if(p && typeof p==='object' && typeof p.text==='string') t.push(p.text); }
+    return t.join('\n');
+  }
+  if(typeof content==='object' && 'parts' in content){
+    const t=[]; for(const p of (content.parts||[])){ if(typeof p==='string') t.push(p); else if(p && typeof p==='object' && typeof p.text==='string') t.push(p.text); }
+    return t.join('\n');
+  }
+  if(typeof content==='string') return content; return '';
+}
+
+// Datei- und Ordnerwahl
+pickFileBtn.addEventListener('click', async ()=>{
+  try{
+    const [h] = await showOpenFilePicker({ startIn:'downloads', types:[{description:'conversations.json', accept:{'application/json':['.json']}}] });
+    const f = await h.getFile();
+    const name = (f.name||'').toLowerCase();
+    if(!name.endsWith('conversations.json')){
+      const ok = confirm(`Gewählte Datei ist "${f.name}". Erwartet wird conversations.json. Fortfahren?`);
+      if(!ok) return;
+    }
+    fileHandle = h;
+    fileInfo.textContent = `${f.name} – ${(f.size/1_000_000).toFixed(1)} MB (Quelle: Datei)`;
+  }catch(e){ if(e?.name!=='AbortError') alert('Dateiauswahl fehlgeschlagen: '+e); }
+});
+
+pickDirBtn.addEventListener('click', async ()=>{
+  try{
+    const opts = {};
+    try{ if(fileHandle) opts.startIn = fileHandle; else opts.startIn = 'downloads'; }catch{}
+    outDirHandle = await window.showDirectoryPicker(opts);
+    dirInfo.textContent = `Ordner gewählt.`;
+  }catch(e){ if(e?.name!=='AbortError') alert('Ordnerwahl fehlgeschlagen: '+e); }
+});
+
+// Schreiben mit File System Access API
+async function writeTextFile(dir, name, text){
+  const h = await dir.getFileHandle(name, {create:true});
+  const w = await h.createWritable();
+  await w.write(text);
+  await w.close();
+}
+
+// Aufbereitung starten
+startBtn.addEventListener('click', async ()=>{
+  if(!fileHandle){ alert('Bitte zuerst die Exportdatei wählen (conversations.json).'); return; }
+  if(!outDirHandle){ alert('Bitte Zielordner wählen.'); return; }
+
+  const partBytes = Number(partSizeSel.value)||20971520;
+  const partsName = `Teile_${Math.round(partBytes/1024/1024)}MB`;
+  const aufbDir = await outDirHandle.getDirectoryHandle('Aufbereitung', {create:true});
+  const teileDir = await aufbDir.getDirectoryHandle(partsName, {create:true});
+  const uebersichtenDir = await aufbDir.getDirectoryHandle('Übersichten', {create:true});
+  const exportDir = await aufbDir.getDirectoryHandle('Exporte', {create:true});
+  // Lege eine kurze README an (nur einmalig überschreiben wir bewusst)
+  try{
+    await writeTextFile(exportDir, 'README.txt',
+      'Exporte\r\n' +
+      '========\r\n\r\n' +
+      '- In diesem Ordner speichert die Anwendung Einzelexporte ausgewählter Chats.\r\n' +
+      '- Export aus der Oberfläche: Format rechts oben wählen (HTML/MD/TXT) und auf "Export" klicken.\r\n' +
+      '- Die Dateinamen beginnen mit Datum/Uhrzeit (yymmdd_hhmm_Chatname).\r\n' +
+      '\r\nHinweis: Die Aufbereitung erfolgt lokal. Es werden keine Daten hochgeladen.'
+    );
+  }catch{}
+
+  // Sicherheitsabfrage: Falls Dateien existieren, Nachfrage
+  let existing = false;
+  for await (const e of teileDir.values()){ existing = true; break; }
+  if(existing){
+    const ok = confirm('Im Ziel sind bereits Teile vorhanden. Überschreiben?\nEmpfehlung: Ja, wenn du sicher denselben Export neu aufbereitest.');
+    if(!ok) return;
+  }
+
+  prog.hidden = false; prog.value = 0; setStatus('Beginne Aufbereitung …');
+
+  // CSV-Schreiber vorbereiten
+  let idxOut=null, msgOut=null;
+  if(makeIndex.checked){ idxOut = await uebersichtenDir.getFileHandle('index.csv', {create:true}); }
+  if(makeMessages.checked){ msgOut = await uebersichtenDir.getFileHandle('messages.csv', {create:true}); }
+  let idxW=null, msgW=null;
+  if(idxOut){ idxW = await idxOut.createWritable(); await idxW.write(bom + 'conversation_id,title,messages,first_time,last_time,part_file\n'); }
+  if(msgOut){ msgW = await msgOut.createWritable(); await msgW.write(bom + 'conversation_id,title,time,role,text\n'); }
+
+  // Streaming-Parser
+  const file = await fileHandle.getFile();
+  const reader = file.stream().getReader();
+  const dec = new TextDecoder('utf-8');
+  let buf = '';
+  let seenBracket = false;
+  let total = 0;
+  let processed = 0;
+
+  // Teil-Schreiben
+  let partIdx=1; let partArr=[]; let curBytes=0;
+  const flushPart = async ()=>{
+    if(!partArr.length) return;
+    const text = JSON.stringify(partArr);
+    const safe = text.replace('\u2028','\\u2028').replace('\u2029','\\u2029');
+    const name = `conversations_part_${String(partIdx).padStart(3,'0')}.json`;
+    const fh = await teileDir.getFileHandle(name, {create:true});
+    const w = await fh.createWritable();
+    await w.write(safe); await w.close();
+    partIdx += 1; partArr = []; curBytes = 0;
+  };
+
+  // Helfer zum Summarize
+  function summarize(conv){
+    const map = conv.mapping||{}; let first=null, last=null, cnt=0;
+    for(const k in map){
+      const msg = (map[k]||{}).message||{}; const role = (msg.author||{}).role;
+      if(role==='user'||role==='assistant') cnt++;
+      const ts = msg.create_time; if(typeof ts==='number'){ if(first==null||ts<first) first=ts; if(last==null||ts>last) last=ts; }
+    }
+    return {cnt, first, last};
+  }
+  // textFromContent steht bereits global zur Verfügung
+
+  // Objekt aus Buffer lesen (Top-Level-Objekt im Array)
+  async function* objectsFromBuffer(){
+    let i=0; let inStr=false; let esc=false; let depth=0; let start=-1;
+    while(i<buf.length){
+      const ch = buf[i];
+      if(!seenBracket){
+        if(ch==='['){ seenBracket=true; i++; continue; }
+        i++; continue;
+      }
+      if(ch==='"') { if(!esc) inStr=!inStr; esc=false; i++; continue; }
+      if(inStr){ esc = ch==='\\' && !esc; i++; continue; }
+      if(ch==='{'){ if(depth===0) start=i; depth++; i++; continue; }
+      if(ch==='}'){ depth--; i++; if(depth===0 && start>=0){ const objText = buf.slice(start, i); yield objText; start=-1; }
+        continue; }
+      if(ch===']' && depth===0){ i++; /* Ende */ buf = buf.slice(i); return; }
+      i++;
+    }
+    buf = buf.slice(start>=0? start : buf.length);
+  }
+
+  // Lesen in Schleife
+  while(true){
+    const {value, done} = await reader.read();
+    if(done) break;
+    total += value.byteLength;
+    buf += dec.decode(value, {stream:true});
+    for await (const objText of objectsFromBuffer()){
+      let conv; try{ conv = JSON.parse(objText); }catch(e){ console.error('JSON-Fehler', e); continue; }
+      processed++;
+      const {cnt, first, last} = summarize(conv);
+      const convId = conv.id || '';
+      const title = conv.title || '';
+      const partName = `conversations_part_${String(partIdx).padStart(3,'0')}.json`;
+
+      if(idxW){ await idxW.write(`${convId},"${title.replaceAll('"','""')}",${cnt},${first?toLocalIso(first):''},${last?toLocalIso(last):''},${partName}\n`); }
+      if(msgW){
+        const map = conv.mapping||{};
+        for(const k in map){ const msg = (map[k]||{}).message||{}; const role=(msg.author||{}).role; if(role!=='user'&&role!=='assistant') continue; const t = textFromContent(msg.content||{}); const time = msg.create_time?toLocalIso(msg.create_time):''; await msgW.write(`${convId},"${title.replaceAll('"','""')}",${time},${role},"${(t||'').replaceAll('"','""').replaceAll('\n','\r\n')}"\n`);} }
+
+      const text = JSON.stringify(conv); const bytes = new TextEncoder().encode(text).length;
+      if(partArr.length && (curBytes + bytes) > partBytes){ await flushPart(); }
+      partArr.push(conv); curBytes += bytes;
+
+      if(processed % 100 === 0){ setStatus(`Verarbeitet: ${processed} Konversationen …`); }
+    }
+    prog.value = Math.round((total / file.size) * 100);
+  }
+  await flushPart();
+  if(idxW){ await idxW.close(); }
+  if(msgW){ await msgW.close(); }
+
+  prog.value = 100; setStatus(`Fertig. ${processed} Konversationen verarbeitet.`);
+  // Anzeigeordner setzen und Button aktivieren
+  viewDirHandle = await outDirHandle.getDirectoryHandle('Aufbereitung');
+  try{ await dbPut('viewDir', viewDirHandle); }catch{}
+  openPreparedBtn.disabled = false;
+});
+
+// Anzeige-Teil (Viewer)
+async function readTextFile(handle){ const f = await handle.getFile(); return await f.text(); }
+
+async function loadIndexFromDir(dir){
+  try{
+    // Finde index.csv in Unterordner "Übersichten"
+    const u = await dir.getDirectoryHandle('Übersichten');
+    const ih = await u.getFileHandle('index.csv');
+    const txt = await readTextFile(ih);
+    const rows = parseCSV(txt);
+    const header = rows.shift();
+    const col = Object.fromEntries(header.map((h,i)=>[h,i]));
+    indexRows = rows.map(r=>({conversation_id:r[col['conversation_id']]||'', title:r[col['title']]||'', messages:Number(r[col['messages']]||'0')||0, first_time:r[col['first_time']]||'', last_time:r[col['last_time']]||'', part_file:r[col['part_file']]||''}));
+    listInfo.textContent = `${indexRows.length} Einträge`;
+    renderList();
+  }catch(e){ listBody.innerHTML='<div class="empty">index.csv nicht gefunden. Bitte den Aufbereitungsordner wählen.</div>'; }
+}
+
+function parseCSV(text){
+  const rows=[]; let row=[]; let cur=''; let i=0; let q=false; if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  while(i<text.length){ const c=text[i++]; if(q){ if(c==='"'){ if(text[i]==='"'){ cur+='"'; i++; } else { q=false; } } else { cur+=c; } } else { if(c==='"'){ q=true; } else if(c===','){ row.push(cur); cur=''; } else if(c==='\n'){ row.push(cur.replace(/\r$/,'')); rows.push(row); row=[]; cur=''; } else { cur+=c; } } }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); } return rows;
+}
+
+function renderList(){
+  const q=(listSearch.value||'').toLowerCase();
+  const rows=indexRows.filter(r=>r.title.toLowerCase().includes(q)||r.conversation_id.toLowerCase().includes(q));
+  const re = q? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig') : null;
+  const hl = (s)=>{ if(!s) return ''; if(!re) return escapeHtml(s); return escapeHtml(s).replace(re, m=>`<mark>${m}</mark>`); };
+  listBody.innerHTML = rows.slice(0,500).map(r=>`
+    <div class="item" data-id="${r.conversation_id}" data-part="${r.part_file}">
+      <div class="t">${hl(r.title)||'(ohne Titel)'}</div>
+      <div class="s">${hl(r.conversation_id)} · ${r.messages} Nachrichten · ${r.last_time||''}</div>
+    </div>`).join('') || '<div class="empty">Keine Treffer.</div>';
+}
+
+function escapeHtml(s){return (s||'').replace(/[&<>\"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));}
+
+async function loadConversation(dir, partFile, convId){
+  try{
+    // Teile-Unterordner finden (beliebiger Name beginnt mit "Teile_")
+    let teile = null; for await (const e of dir.values()){ if(e.kind==='directory' && e.name.startsWith('Teile_')) { teile = await dir.getDirectoryHandle(e.name); break; } }
+    if(!teile){ chatTitleEl.textContent='Teile-Ordner nicht gefunden.'; chatMsgs.innerHTML=''; return; }
+    const fh = await teile.getFileHandle(partFile);
+    const txt = await readTextFile(fh);
+    const arr = JSON.parse(txt);
+    const conv = arr.find(o=> (o.id||'')===convId );
+    if(!conv){ chatTitleEl.textContent='Nicht gefunden.'; chatMsgs.innerHTML=''; return; }
+    const msgs = extractMessages(conv);
+    currentMessages = msgs; currentConvId = convId; currentPart = partFile; currentTitle = conv.title||'Unterhaltung';
+    renderChat(currentTitle, currentConvId, currentMessages);
+  }catch(e){ chatTitleEl.textContent='Fehler: '+e; chatMsgs.innerHTML=''; }
+}
+
+function extractMessages(conv){
+  const mapping = conv.mapping||{}; const out=[];
+  for(const k in mapping){ const msg=(mapping[k]||{}).message||{}; const role=(msg.author||{}).role; if(role==='user'||role==='assistant'){ const text=textFromContent(msg.content||{}); const ts=msg.create_time; if(text && String(text).trim()){ out.push({role,time: toLocalIso(ts), text, kind:'text'});} else { out.push({role,time: toLocalIso(ts), text:'', kind:'nontext', techInfo:'technischer Eintrag'}); } } }
+  out.sort((a,b)=> (a.time||'').localeCompare(b.time||'')); return out;
+}
+
+function highlight(htmlText, q){ if(!q) return htmlText; try{ const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'); return htmlText.replace(re, m=>`<mark>${m}</mark>`);}catch{return htmlText;} }
+
+function renderChat(title, convId, messages){
+  chatTitleEl.textContent = `${title} — ${convId}`;
+  chatTitleEl.title = chatTitleEl.textContent;
+  const showTech=showTechEl.checked; const list = showTech? messages : messages.filter(m=>m.kind!=='nontext');
+  const q=(chatSearch.value||'').trim();
+  chatMsgs.innerHTML = list.map(m=>`
+    <div class="msg ${m.role} ${m.kind==='nontext'?'nontext':''}">
+      <div class="role">${escapeHtml(m.role)}</div>
+      <div class="bubble">
+        ${m.time?`<div class="time">${escapeHtml(m.time)}</div>`:''}
+        ${m.kind==='nontext'? `<em>${escapeHtml(m.techInfo||'technisch')}</em>` : highlight(escapeHtml(m.text), q)}
+      </div>
+    </div>`).join('');
+  matchNodes = Array.from(chatMsgs.querySelectorAll('mark')); matchIndex=0; updateHitInfo(); if(matchNodes.length){ scrollToMatch(0); }
+}
+
+function updateHitInfo(){ if(!matchNodes.length){ hitInfo.textContent='0/0 Treffer'; hitNav.style.display='none'; return;} hitInfo.textContent = `${matchIndex+1}/${matchNodes.length} Treffer`; hitNav.style.display='flex'; }
+function scrollToMatch(i){
+  if(!matchNodes.length){ updateHitInfo(); return; }
+  if(i<0) i=matchNodes.length-1; if(i>=matchNodes.length) i=0; matchIndex=i;
+  const el=matchNodes[matchIndex];
+  // Scrolle den Treffer in die Mitte des sichtbaren Bereichs des nächstgelegenen Scroll-Containers (hier: chatMsgs)
+  try{ el.scrollIntoView({block:'center', inline:'nearest', behavior:'smooth'}); }catch{ el.scrollIntoView(); }
+  updateHitInfo();
+}
+
+// Viewer Events
+async function ensureReadable(handle){
+  try{
+    if(!handle?.queryPermission || !handle?.requestPermission) return true;
+    let p = await handle.queryPermission({mode:'read'});
+    if(p === 'granted') return true;
+    p = await handle.requestPermission({mode:'read'});
+    return p === 'granted';
+  }catch{ return false; }
+}
+
+openPreparedBtn.addEventListener('click', async ()=>{
+  if(!viewDirHandle){ alert('Bitte erst aufbereiten.'); return; }
+  try{
+    const ok = await ensureReadable(viewDirHandle);
+    if(!ok){ alert('Zugriff verweigert. Bitte "Quelle ändern" nutzen und Ordner neu wählen.'); return; }
+    await loadIndexFromDir(viewDirHandle);
+  }catch(e){ if(e?.name!=='AbortError') alert('Quelle konnte nicht geöffnet werden: '+e); }
+});
+
+openRememberedBtn.addEventListener('click', async ()=>{
+  try{
+    let h = await dbGet('viewDir');
+    if(h){
+      const ok = await ensureReadable(h);
+      if(ok){ viewDirHandle = h; updateSourceButton(true); await loadIndexFromDir(viewDirHandle); return; }
+    }
+    // Kein nutzbarer Handle: Ordnerdialog öffnen
+    h = await window.showDirectoryPicker();
+    viewDirHandle = h; await dbPut('viewDir', h); updateSourceButton(true);
+    await loadIndexFromDir(viewDirHandle);
+  }catch(e){ if(e?.name!=='AbortError') alert('Quelle konnte nicht geöffnet werden: '+e); }
+});
+
+changeSourceBtn.addEventListener('click', async ()=>{
+  try{
+    const h = await window.showDirectoryPicker();
+    viewDirHandle = h; await dbPut('viewDir', h); updateSourceButton(true);
+    await loadIndexFromDir(viewDirHandle);
+  }catch(e){ if(e?.name!=='AbortError') alert('Ordnerwahl fehlgeschlagen: '+e); }
+});
+listSearch.addEventListener('input', renderList);
+listBody.addEventListener('click', (e)=>{ const item=e.target.closest('.item'); if(!item) return; loadConversation(viewDirHandle, item.getAttribute('data-part'), item.getAttribute('data-id')); });
+showTechEl.addEventListener('change', ()=>{ if(currentConvId) renderChat(currentTitle, currentConvId, currentMessages); });
+chatSearch.addEventListener('input', ()=>{ if(currentConvId) renderChat(currentTitle, currentConvId, currentMessages); });
+nextHit.addEventListener('click', ()=>{ if(matchNodes.length) scrollToMatch(matchIndex+1); });
+prevHit.addEventListener('click', ()=>{ if(matchNodes.length) scrollToMatch(matchIndex-1); });
+chatSearch.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ if(matchNodes.length){ scrollToMatch(matchIndex+1); e.preventDefault(); } } });
+// Floating Treffer-Navigation neben "Nach oben"
+document.getElementById('nextHitFloat').addEventListener('click', ()=>{ if(matchNodes.length) scrollToMatch(matchIndex+1); });
+document.getElementById('prevHitFloat').addEventListener('click', ()=>{ if(matchNodes.length) scrollToMatch(matchIndex-1); });
+
+// Chat-Export (HTML/MD/TXT)
+function doExport(ext){ return (async ()=>{
+  if(!currentConvId){ alert('Bitte zuerst einen Chat auswählen.'); return; }
+  // Dateiname: yymmdd_hhmm_%chat_name%
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(2);
+  const MM = String(d.getMonth()+1).padStart(2,'0');
+  const DD = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const prefix = `${yy}${MM}${DD}_${hh}${mm}`;
+  const nameBase = `${prefix}_` + (currentTitle||'Unterhaltung').replace(/[^\w\-]+/g,'_').slice(0,50);
+  let content='';
+  if(ext==='html'){
+    const css = '.bubble{white-space:pre-wrap;border:1px solid #e3e6ea;border-radius:8px;padding:8px} .assistant .bubble{background:#f0f7ff} .user .bubble{background:#fff} .role{font-weight:600} .time{color:#666;font-size:12px;margin-bottom:4px}';
+    content = `<!doctype html><meta charset="utf-8"><title>${escapeHtml(currentTitle)}</title><style>${css}</style><h1>${escapeHtml(currentTitle)}</h1>` + currentMessages.map(m=>`<div class="msg ${m.role}"><div class="role">${escapeHtml(m.role)}</div><div class="bubble">${m.time?`<div class="time">${escapeHtml(m.time)}</div>`:''}${escapeHtml(m.text)}</div></div>`).join('');
+  } else if(ext==='md'){
+    content = `# ${currentTitle}\n\n` + currentMessages.map(m=>`**${m.role}** ${m.time?`_(${m.time})_`:''}\n\n${m.text}\n\n`).join('');
+  } else if(ext==='txt'){
+    content = `${currentTitle}\n\n` + currentMessages.map(m=>`${m.role}${m.time?` (${m.time})`:''}:\n${m.text}\n\n`).join('');
+  } else { alert('Unbekanntes Format.'); return; }
+  try{
+    // Bevorzugt: „Speichern unter“-Dialog mit vorgeschlagenem Namen und Startordner
+    const pickerOpts = {
+      suggestedName: `${nameBase}.${ext}`,
+      types: [
+        {description: 'HTML', accept: {'text/html': ['.html']}},
+        {description: 'Markdown', accept: {'text/markdown': ['.md']}},
+        {description: 'Text', accept: {'text/plain': ['.txt']}},
+      ]
+    };
+    // Versuche, im gemerkten Aufbereitungsordner zu starten
+    try{ if(viewDirHandle) pickerOpts.startIn = viewDirHandle; }catch{}
+    const fileHandle = await window.showSaveFilePicker(pickerOpts);
+    const w = await fileHandle.createWritable();
+    await w.write(content); await w.close();
+    alert('Export gespeichert.');
+  }catch(e){
+    // Fallback: schreibe in Aufbereitung/Exporte, falls Nutzer den Dialog abbricht oder API nicht verfügbar
+    if(e && e.name === 'AbortError') return; // bewusst abgebrochen
+    try{
+      const exportDir = await viewDirHandle.getDirectoryHandle('Exporte', {create:true});
+      const fh = await exportDir.getFileHandle(`${nameBase}.${ext}`, {create:true});
+      const w=await fh.createWritable(); await w.write(content); await w.close();
+      alert('Export gespeichert in Ordner "Exporte".');
+    }catch(err){ alert('Konnte Datei nicht speichern: '+err); }
+  }
+}); }
+exportChatTopBtn.addEventListener('click', ()=>{ const ext=(exportFormatTopSel.value||'html').toLowerCase(); doExport(ext)(); });
+
+// Initial: Button-Farbe je nach gespeicherter Quelle setzen
+(async ()=>{ try{ const h=await dbGet('viewDir'); updateSourceButton(!!h);}catch{ updateSourceButton(false);} })();
+
+// Nach-oben-Schalter sichtbar ab etwas Scrolltiefe
+window.addEventListener('scroll', ()=>{
+  backToTopBtn.style.display = window.scrollY > 300 ? 'block' : 'none';
+});
+backToTopBtn.addEventListener('click', ()=>{ window.scrollTo({top:0, behavior:'smooth'}); });
+
+// Hilfe-Modal
+if(helpBtn && helpModal && helpClose){
+  helpBtn.addEventListener('click', ()=>{ helpModal.style.display='flex'; });
+  helpClose.addEventListener('click', ()=>{ helpModal.style.display='none'; });
+  helpModal.addEventListener('click', (e)=>{ if(e.target===helpModal) helpModal.style.display='none'; });
+}
+
+</script>
