@@ -774,7 +774,14 @@ if(fbBtn && fbModal && fbClose){
 
 function buildRating(id){
   const host = document.getElementById(id); if(!host || host.childElementCount) return;
-  for(let i=1;i<=10;i++){ const lbl=document.createElement('label'); lbl.style.display='inline-flex'; lbl.style.alignItems='center'; lbl.style.gap='4px'; const r=document.createElement('input'); r.type='radio'; r.name=id; r.value=String(i); lbl.appendChild(r); lbl.appendChild(document.createTextNode(String(i))); host.appendChild(lbl);} }
+  for(let i=1;i<=5;i++){
+    const lbl=document.createElement('label');
+    lbl.style.display='inline-flex'; lbl.style.alignItems='center'; lbl.style.gap='4px';
+    const r=document.createElement('input'); r.type='radio'; r.name=id; r.value=String(i);
+    lbl.appendChild(r); lbl.appendChild(document.createTextNode(String(i)));
+    host.appendChild(lbl);
+  }
+}
 
 fbSend?.addEventListener('click', async ()=>{
   try{
@@ -788,7 +795,7 @@ fbSend?.addEventListener('click', async ()=>{
     const consent = document.getElementById('fbConsent').checked;
     const honey = fbForm.querySelector('input[name="_hp"]').value;
     if(honey){ alert('Validierung fehlgeschlagen.'); return; }
-    if(!overall || !clarity || !func || !structure){ alert('Bitte alle Bewertungen setzen (1–10).'); return; }
+    if(!overall || !clarity || !func || !structure){ alert('Bitte alle Bewertungen setzen (1–5).'); return; }
     if(!consent){ alert('Bitte Zustimmung zur Nutzung des Feedbacks erteilen.'); return; }
     fbSend.disabled = true;
     const payload = {

@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   try {
     const { overall, clarity, functionality, structure, helpful, comment, app, version, time, ua } = req.body || {};
     // Basic validation
-    const isNum = (v) => typeof v === 'number' && v >= 1 && v <= 10;
+    const isNum = (v) => typeof v === 'number' && v >= 1 && v <= 5;
     if (!isNum(overall) || !isNum(clarity) || !isNum(functionality) || !isNum(structure)) {
       return res.status(400).json({ error: 'invalid ratings' });
     }
@@ -51,4 +51,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'server_error', details: String(e) });
   }
 }
-
