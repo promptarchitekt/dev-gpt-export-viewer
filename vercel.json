@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/", "destination": "/GPT-Export-Aufbereiter/chat_aufbereiten.html", "permanent": false }
+  ]
+}
