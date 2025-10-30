@@ -72,7 +72,7 @@ Aufbereitung/
 
 - ChatGPT‑Exporte kommen als eine große `conversations.json` (teils >500 MB) – Editor/Excel stürzen ab oder frieren ein.
 - Es gibt kaum GUI‑Werkzeuge für Nicht‑Techniker, die große Exporte lokal und datenschutzfreundlich aufbereiten.
-- Viele Skripte erwarten Terminal‑Know‑how oder laden Daten in die Cloud – beides ist hier nicht gewünscht.
+- Viele Skripte erwarten Terminal‑Know‑how oder laden Daten in die Cloud – beides ist hier nicht nötig.
 - Dieses Tool läuft rein lokal im Browser (Chrome/Edge) und führt dich in 3 Klicks von der Quelle zur Ansicht, inkl. Suche und Einzelexport.
 - Ergebnis ist strukturiert und weiterverwendbar: handliche JSON‑Teile, `index.csv`, `messages.csv`, plus HTML/MD/TXT‑Export.
 
