@@ -54,6 +54,18 @@
   #backToTop{position:fixed; right:20px; bottom:20px; display:none; border:1px solid #188038; background:#188038; color:#fff; border-radius:20px; padding:8px 12px; box-shadow:0 2px 8px rgba(0,0,0,.12); cursor:pointer}
   #hitNav{position:fixed; right:20px; bottom:64px; display:none; gap:6px}
   #hitNav button{border:1px solid #188038; background:#188038; color:#fff; border-radius:20px; padding:8px 10px; cursor:pointer}
+  /* Feedback FAB */
+  #feedbackBtn{position:fixed; right:20px; bottom:120px; background:#0b57d0; color:#fff; border:1px solid #0b57d0; border-radius:24px; padding:10px 14px; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.15); z-index:900}
+  #feedbackBtn:hover{filter:brightness(1.05)}
+  /* Feedback Modal */
+  #fbModal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:1000}
+  .fbCard{background:#fff; width:min(680px, 94%); border:1px solid #c9d1dc; border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.18); padding:16px}
+  .fbRow{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0}
+  .fbRow label{min-width:180px}
+  .fbGroup{display:flex; gap:8px; flex-wrap:wrap}
+  .fbGroup input[type="radio"]{accent-color:#0b57d0}
+  .fbActions{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+  .fbInput, .fbSelect{padding:8px 10px; border:1px solid #c9d1dc; border-radius:6px; flex:1}
   .meta{padding:12px 16px;border-bottom:1px solid #d5dde7;background:#fafbfc}
   .meta .row{display:flex;gap:12px;align-items:center;flex-wrap:nowrap}
   #chatTitle{flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -163,6 +175,7 @@
 
 <button id="backToTop" title="Nach oben">Nach oben</button>
 <div id="hitNav"><button id="prevHitFloat" title="Vorheriger Treffer">◀</button><button id="nextHitFloat" title="Nächster Treffer">▶</button></div>
+<button id="feedbackBtn" title="Feedback geben">Feedback</button>
 
 <!-- Hilfe-Modal -->
 <div id="helpModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:1000">
@@ -191,6 +204,58 @@
       <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px;margin-bottom:6px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Umlaute/Excel?</summary><div style="margin-top:6px">CSVs sind UTF‑8 mit BOM; sehr große Dateien laden in Excel langsamer.</div></details>
       <details style="border:1px solid #e3e6ea;border-radius:8px;padding:8px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">Exporte</summary><div style="margin-top:6px">Einzelexporte werden im Ordner <b>Exporte</b> gespeichert. Formate: <b>HTML</b>, <b>Markdown (.md)</b>, <b>Text (.txt)</b>.</div></details>
     </div>
+  </div>
+</div>
+
+<!-- Feedback Modal -->
+<div id="fbModal">
+  <div class="fbCard">
+    <div class="fbRow" style="justify-content:space-between">
+      <h3 style="margin:0">Feedback</h3>
+      <button id="fbClose" class="btn-ghost">Schließen</button>
+    </div>
+    <form id="fbForm">
+      <div class="fbRow">
+        <label>Gesamteindruck</label>
+        <div class="fbGroup" id="rateOverall"></div>
+      </div>
+      <div class="fbRow">
+        <label>Klarheit</label>
+        <div class="fbGroup" id="rateClarity"></div>
+      </div>
+      <div class="fbRow">
+        <label>Funktionalität</label>
+        <div class="fbGroup" id="rateFunction"></div>
+      </div>
+      <div class="fbRow">
+        <label>Struktur</label>
+        <div class="fbGroup" id="rateStructure"></div>
+      </div>
+      <div class="fbRow">
+        <label>Was war hilfreich?</label>
+        <select class="fbSelect" name="helpful">
+          <option value="search">Suche & Treffer</option>
+          <option value="split">Aufbereitung in Teile</option>
+          <option value="export">Exporte (HTML/MD/TXT)</option>
+          <option value="usability">Bedienung/Erklärung</option>
+          <option value="other">Anderes</option>
+        </select>
+      </div>
+      <div class="fbRow">
+        <label>Kommentar (optional)</label>
+        <textarea class="fbInput" name="comment" rows="4" placeholder="Was ist gut/schlecht/anders?"></textarea>
+      </div>
+      <div class="fbRow" style="font-size:12px; color:#555">
+        <label></label>
+        <div>
+          <label><input type="checkbox" id="fbConsent"> Ich stimme zu, dass diese Angaben zur Verbesserung des Tools genutzt werden.</label>
+        </div>
+      </div>
+      <div class="fbActions">
+        <button type="button" id="fbSend" class="primary">Senden</button>
+      </div>
+      <input type="text" name="_hp" style="display:none" autocomplete="off">
+    </form>
   </div>
 </div>
 
@@ -233,6 +298,11 @@ const exportFormatTopSel = document.getElementById('exportFormatTop');
 const helpBtn = document.getElementById('helpBtn');
 const helpModal = document.getElementById('helpModal');
 const helpClose = document.getElementById('helpClose');
+const fbBtn = document.getElementById('feedbackBtn');
+const fbModal = document.getElementById('fbModal');
+const fbClose = document.getElementById('fbClose');
+const fbForm = document.getElementById('fbForm');
+const fbSend = document.getElementById('fbSend');
 
 // Zustände
 let fileHandle = null;
@@ -694,5 +764,42 @@ if(helpBtn && helpModal && helpClose){
   helpClose.addEventListener('click', ()=>{ helpModal.style.display='none'; });
   helpModal.addEventListener('click', (e)=>{ if(e.target===helpModal) helpModal.style.display='none'; });
 }
+
+// Feedback Modal
+if(fbBtn && fbModal && fbClose){
+  fbBtn.addEventListener('click', ()=>{ fbModal.style.display='flex'; buildRating('rateOverall'); buildRating('rateClarity'); buildRating('rateFunction'); buildRating('rateStructure'); });
+  fbClose.addEventListener('click', ()=>{ fbModal.style.display='none'; });
+  fbModal.addEventListener('click', (e)=>{ if(e.target===fbModal) fbModal.style.display='none'; });
+}
+
+function buildRating(id){
+  const host = document.getElementById(id); if(!host || host.childElementCount) return;
+  for(let i=1;i<=10;i++){ const lbl=document.createElement('label'); lbl.style.display='inline-flex'; lbl.style.alignItems='center'; lbl.style.gap='4px'; const r=document.createElement('input'); r.type='radio'; r.name=id; r.value=String(i); lbl.appendChild(r); lbl.appendChild(document.createTextNode(String(i))); host.appendChild(lbl);} }
+
+fbSend?.addEventListener('click', async ()=>{
+  try{
+    const requireVal = (name)=>{ const els=fbForm.querySelectorAll(`input[name="${name}"]`); for(const e of els){ if(e.checked) return e.value; } return null; };
+    const overall = requireVal('rateOverall');
+    const clarity = requireVal('rateClarity');
+    const func = requireVal('rateFunction');
+    const structure = requireVal('rateStructure');
+    const helpful = fbForm.querySelector('select[name="helpful"]').value;
+    const comment = fbForm.querySelector('textarea[name="comment"]').value || '';
+    const consent = document.getElementById('fbConsent').checked;
+    const honey = fbForm.querySelector('input[name="_hp"]').value;
+    if(honey){ alert('Validierung fehlgeschlagen.'); return; }
+    if(!overall || !clarity || !func || !structure){ alert('Bitte alle Bewertungen setzen (1–10).'); return; }
+    if(!consent){ alert('Bitte Zustimmung zur Nutzung des Feedbacks erteilen.'); return; }
+    fbSend.disabled = true;
+    const payload = {
+      overall:Number(overall), clarity:Number(clarity), functionality:Number(func), structure:Number(structure), helpful, comment,
+      app:'gpt-export-viewer', version:'0.1.0', time:new Date().toISOString(), ua:navigator.userAgent
+    };
+    const res = await fetch('/api/feedback', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    if(!res.ok){ const t = await res.text(); throw new Error(t||'Fehler beim Senden'); }
+    alert('Danke für dein Feedback!'); fbModal.style.display='none'; fbForm.reset();
+  }catch(e){ alert('Senden fehlgeschlagen: '+e); }
+  finally{ fbSend.disabled = false; }
+});
 
 </script>
