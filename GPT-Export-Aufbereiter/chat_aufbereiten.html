@@ -8,6 +8,10 @@
   h1{font-size:18px;margin:0}
   .wrap{max-width:1200px;margin:0 auto;padding:16px}
   .card{background:#fff;border:1px solid #c9d1dc;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  /* Erfolgs-Hervorhebung */
+  @keyframes pulseSuccess{0%{box-shadow:0 0 0 0 rgba(24,128,56,.35)}70%{box-shadow:0 0 0 10px rgba(24,128,56,0)}100%{box-shadow:0 0 0 0 rgba(24,128,56,0)}}
+  .pulse-success{animation:pulseSuccess 1.6s ease-out 3}
+  #viewCard.ready{border-color:#188038}
   details.card{padding:0; overflow:hidden; border-radius:10px}
   details.card>summary{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #d5dde7;cursor:pointer;list-style:none;background:#f8fafc; border-top-left-radius:10px; border-top-right-radius:10px; user-select:none; caret-color:transparent}
   details.card>summary .caret{display:inline-block;transform:rotate(0deg);transition:transform .15s ease;color:var(--accent);font-weight:700}
@@ -111,7 +115,7 @@
 
   <div style="height:12px"></div>
 
-  <div class="card">
+  <div class="card" id="viewCard">
     <h2>Schritt 2: Quelle anzeigen</h2>
     <div class="row">
       <button id="openRemembered" class="primary" title="Öffnet die zuletzt verwendete Quelle">Quelle öffnen</button>
@@ -471,6 +475,18 @@ startBtn.addEventListener('click', async ()=>{
   viewDirHandle = await outDirHandle.getDirectoryHandle('Aufbereitung');
   try{ await dbPut('viewDir', viewDirHandle); }catch{}
   openPreparedBtn.disabled = false;
+  // Visuelles Feedback: Schritt 2 hervorheben und "Quelle öffnen" pulsieren lassen
+  try{
+    updateSourceButton(true);
+    const openBtn = document.getElementById('openRemembered');
+    const vCard = document.getElementById('viewCard');
+    vCard?.classList.add('ready','pulse-success');
+    openBtn?.classList.add('pulse-success');
+    // Scroll sanft zu Schritt 2
+    vCard?.scrollIntoView({behavior:'smooth', block:'start'});
+    // Puls nach einigen Sekunden entfernen
+    setTimeout(()=>{ openBtn?.classList.remove('pulse-success'); }, 5200);
+  }catch{}
 });
 
 // Anzeige-Teil (Viewer)
