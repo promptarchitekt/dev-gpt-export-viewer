@@ -23,12 +23,12 @@ Fokus:
 
 ## Quick Start
 
-1) Öffne die Datei `GPT-Export-Aufbereiter/chat_aufbereiten.html` im Chrome oder Edge.
-2) Schritt 1 (aufklappbar)
+1. Öffne die Datei `GPT-Export-Aufbereiter/chat_aufbereiten.html` im Chrome oder Edge.
+2. Schritt 1 (aufklappbar)
    - Quelle: „Quelle wählen“ → `conversations.json` wählen (aus entzipptem Export).
    - Ziel: „Zielordner wählen“ → App legt dort `Aufbereitung/…` an.
    - „Aufbereitung starten“ → danach „Aufbereitungsordner öffnen“.
-3) Schritt 2
+3. Schritt 2
    - Links: Liste (Suche nach Titel/ID).
    - Rechts: Chat‑Ansicht (Suche, Treffer‑Navigation, Export).
 
@@ -67,7 +67,6 @@ Aufbereitung/
 
 - Ohne Lizenzdatei – bitte vor öffentlicher Wiederverwendung klären.
 
-
 ## Warum dieses Tool? (Pain‑Points)
 
 - ChatGPT‑Exporte kommen als eine große `conversations.json` (teils >500 MB) – Editor/Excel stürzen ab oder frieren ein.
@@ -80,3 +79,27 @@ Aufbereitung/
 
 - Vercel (static): Root leitet auf `GPT-Export-Aufbereiter/chat_aufbereiten.html`.
 - Browser‑Hinweis: Chrome/Edge empfohlen (FS‑API). In Firefox/Safari ist Export per Download‑Fallback verfügbar.
+
+## Lokales Starten (Windows `pwsh.exe`)
+
+Die App ist eine rein statische HTML‑Anwendung. Es gibt keinen Build‑Schritt — du kannst die Dateien direkt im Browser öffnen oder einen kleinen HTTP‑Server starten.
+
+- Schnell (Python, port 8000):
+
+```powershell
+cd 'C:\pa\07-dev-play\07_gpt_export_manager'
+python -m http.server 8000
+# öffne http://localhost:8000
+```
+
+- Mit Node/NPM (npx http-server, port 3000):
+
+```powershell
+cd 'C:\pa\07-dev-play\07_gpt_export_manager'
+npx http-server . -p 3000
+# öffne http://localhost:3000
+```
+
+- Oder per Doppelklick: `index.html` öffnen (leitet direkt zu `GPT-Export-Aufbereiter/chat_aufbereiten.html`).
+
+Hinweis: Für die Aufbereitung großer Exporte empfiehlt sich Chrome oder Microsoft Edge (File System Access API).
