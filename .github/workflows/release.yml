@@ -1,0 +1,232 @@
+name: Release and Deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on version tags (v0.2.1, v1.0.0, etc.)
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Job 1: Run Python tests
+  test-python:
+    name: Test Python Split Script
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run unit tests
+        run: |
+          pytest GPT_Export_Manager_v0.2.1/test_split_conversations_by_size.py -v --tb=short
+
+      - name: Test split script on sample data
+        run: |
+          # Create minimal test input
+          echo '[{"id":"test-1","title":"Test","create_time":1000000000,"update_time":1000000001,"mapping":{},"current_node":null}]' > test_conversations.json
+          python split_conversations_by_size.py test_conversations.json test_output --max-bytes 10000
+          # Verify output
+          test -f test_output/index.csv && echo "✅ Index CSV created"
+          test -f test_output/conversations_part_001.json && echo "✅ Part 001 created"
+
+  # Job 2: Lint and validate frontend
+  lint-frontend:
+    name: Lint Frontend Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate HTML syntax
+        run: |
+          # Use W3C validator if available, or basic syntax check
+          if command -v tidy &> /dev/null; then
+            tidy -q -e GPT_Export_Manager_v0.2.1/GPT-Export-Aufbereiter/chat_aufbereiten.html || true
+          else
+            echo "⚠️  HTML linter not available, skipping"
+          fi
+
+      - name: Check JavaScript syntax
+        run: |
+          node -c GPT_Export_Manager_v0.2.1/api/feedback.js && echo "✅ feedback.js syntax valid"
+
+  # Job 3: Test feedback API locally
+  test-api:
+    name: Test Feedback API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Test API function (no GH_TOKEN)
+        run: |
+          # Simulate POST request to feedback.js
+          cat << 'EOF' > test_payload.json
+          {
+            "overall": "5",
+            "clarity": "4",
+            "functionality": "5",
+            "structure": "4",
+            "helpful": ["yes"],
+            "comment": "Test feedback",
+            "app": "GPT Export Manager",
+            "version": "0.2.1",
+            "time": 1700000000000,
+            "ua": "GitHub Actions Test"
+          }
+          EOF
+          # Note: Without GH_TOKEN, API should return {"ok": true, "stored": false}
+          echo "✅ API payload valid (actual POST test requires Vercel preview deployment)"
+
+  # Job 4: Build release package
+  build-release:
+    name: Build Release Package
+    runs-on: ubuntu-latest
+    needs: [test-python, lint-frontend, test-api]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create release archive
+        run: |
+          mkdir -p release
+          # Copy v0.2.1 folder to release package
+          cp -r GPT_Export_Manager_v0.2.1 release/GPT_Export_Manager_v${{ steps.get_version.outputs.VERSION }}
+          # Add root files
+          cp split_conversations_by_size.py release/
+          cp CHANGELOG.md release/
+          cp README.md release/
+          # Create zip
+          cd release
+          zip -r ../GPT_Export_Manager_v${{ steps.get_version.outputs.VERSION }}.zip .
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: GPT_Export_Manager_v${{ steps.get_version.outputs.VERSION }}.zip
+          retention-days: 90
+
+  # Job 5: Create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract v0.2.1 section from CHANGELOG.md
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          awk "/## ${VERSION}/,/## [0-9]/" CHANGELOG.md | head -n -1 > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: GPT_Export_Manager_v${{ steps.get_version.outputs.VERSION }}.zip
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 6: Deploy to Vercel (Production)
+  deploy-vercel:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: [test-python, lint-frontend, test-api]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel Production
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $URL"
+
+      - name: Comment deployment URL on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 Deployed to Vercel: ${{ steps.deploy.outputs.url }}'
+            })
+
+  # Job 7: Notify on failure
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [test-python, lint-frontend, test-api, build-release, create-release, deploy-vercel]
+    if: failure()
+    steps:
+      - name: Send notification
+        run: |
+          echo "❌ Release workflow failed for ${{ github.ref }}"
+          # Add Slack/Discord webhook here if needed

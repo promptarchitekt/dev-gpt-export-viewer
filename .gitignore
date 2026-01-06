@@ -31,3 +31,12 @@ conversations.json
 *.zip
 *.log
 
+# Large test/data files (>100MB GitHub limit)
+chat.html
+chat_*.html
+messages.csv
+shopping.json
+user.json
+message_feedback.json
+shared_conversations.json
+

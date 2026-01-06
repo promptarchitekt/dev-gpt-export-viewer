@@ -1,0 +1,10 @@
+{
+  "name": "gpt-export-viewer",
+  "version": "0.2.1",
+  "description": "Privacy-first local GPT export viewer (static HTML)",
+  "scripts": {
+    "start": "npx http-server . -p 3000",
+    "serve-python": "python -m http.server 8000"
+  },
+  "license": "MIT"
+}
