@@ -616,6 +616,9 @@
           <button id="exportChatTop" title="Aktuellen Chat exportieren">
             Export
           </button>
+          <button id="batchExportBtn" title="Batch-Export (Alle/Filter)" style="margin-left:6px">
+            Batch-Export
+          </button>
           <label title="Format für den Chat-Export">
             <select id="exportFormatTop">
               <option value="html" selected>HTML</option>
@@ -652,6 +655,46 @@
   ><button id="nextHitFloat" title="Nächster Treffer">▶</button>
 </div>
 <button id="feedbackBtn" title="Feedback geben">Feedback</button>
+
+<!-- Batch Export Modal -->
+<div id="batchExportModal" style="position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); z-index: 1000;">
+  <div class="fbCard" style="max-width:760px; width: 94%">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="margin:0">Batch-Export</h3>
+      <button id="batchClose" class="btn-ghost">Schließen</button>
+    </div>
+    <div style="margin-top:12px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <label style="min-width:160px">Scope</label>
+        <label><input type="radio" name="batchScope" value="all" checked /> Alle Chats</label>
+        <label><input type="radio" name="batchScope" value="filtered" /> Gefilterte (Suche)</label>
+        <label><input type="radio" name="batchScope" value="current" /> Aktueller Chat</label>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:12px;align-items:center">
+        <label style="min-width:160px">Format</label>
+        <select id="batchFormat" class="fbSelect"><option value="html">HTML</option><option value="md">Markdown (.md)</option><option value="txt">Text (.txt)</option></select>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:12px;align-items:center">
+        <label style="min-width:160px">Packaging</label>
+        <label><input type="radio" name="batchPack" value="folder" checked /> Ordner (File System API)</label>
+        <label><input type="radio" name="batchPack" value="download" /> Einzelne Downloads (Fallback)</label>
+      </div>
+      <div style="margin-top:12px">
+        <div class="note">Hinweis: Bei großen Exports (>200MB) kann ein ZIP-Server-Export effizienter sein. Local Folder-Write erfordert Chrome/Edge (showDirectoryPicker).</div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
+        <button id="batchStart" class="good">Start Export</button>
+        <button id="batchCancel" class="btn-ghost">Abbrechen</button>
+        <progress id="batchProg" value="0" max="100" style="width:240px; display:inline-block; margin-left:8px" hidden></progress>
+      </div>
+
+      <div id="batchLog" style="margin-top:12px; max-height:240px; overflow:auto; border:1px solid #273549; padding:8px; background:#020617;">
+        <div class="note">Statusliste:</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Hilfe-Modal -->
 <div
@@ -1983,5 +2026,240 @@
     } finally {
       fbSend.disabled = false;
     }
+  });
+
+  // Batch Export Implementation
+  const batchBtn = document.getElementById("batchExportBtn");
+  const batchModal = document.getElementById("batchExportModal");
+  const batchClose = document.getElementById("batchClose");
+  const batchStart = document.getElementById("batchStart");
+  const batchCancel = document.getElementById("batchCancel");
+  const batchProg = document.getElementById("batchProg");
+  const batchLog = document.getElementById("batchLog");
+  const batchFormatSel = document.getElementById("batchFormat");
+
+  let batchCancelRequested = false;
+
+  if (batchBtn && batchModal && batchClose) {
+    batchBtn.addEventListener("click", () => {
+      batchModal.style.display = "flex";
+      batchProg.hidden = true;
+      batchProg.value = 0;
+      batchLog.innerHTML = '<div class="note">Statusliste:</div>';
+      batchCancelRequested = false;
+    });
+    batchClose.addEventListener("click", () => {
+      batchModal.style.display = "none";
+    });
+    batchCancel.addEventListener("click", () => {
+      batchCancelRequested = true;
+    });
+  }
+
+  function sanitizeFilename(s) {
+    return (s || "chat").replace(/[^a-zA-Z0-9-_]+/g, "_").slice(0, 80);
+  }
+
+  function nameBaseFromTitle(title) {
+    const d = new Date();
+    const yy = String(d.getFullYear()).slice(2);
+    const MM = String(d.getMonth() + 1).padStart(2, "0");
+    const DD = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    const prefix = `${yy}${MM}${DD}_${hh}${mm}`;
+    return `${prefix}_${sanitizeFilename(title)}`;
+  }
+
+  function generateContent(messages, title, ext) {
+    if (ext === "html") {
+      const css =
+        ".bubble{white-space:pre-wrap;border:1px solid #e3e6ea;border-radius:8px;padding:8px} .assistant .bubble{background:#f0f7ff} .user .bubble{background:#fff} .role{font-weight:600} .time{color:#666;font-size:12px;margin-bottom:4px}";
+      return (
+        `<!doctype html><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${css}</style><h1>${escapeHtml(title)}</h1>` +
+        messages
+          .map(
+            (m) =>
+              `<div class="msg ${m.role}"><div class="role">${escapeHtml(m.role)}</div><div class="bubble">${m.time ? `<div class="time">${escapeHtml(m.time)}</div>` : ""}${escapeHtml(m.text)}</div></div>`
+          )
+          .join("")
+      );
+    }
+    if (ext === "md") {
+      return (
+        `# ${title}\n\n` +
+        messages
+          .map((m) => `**${m.role}** ${m.time ? `_(${m.time})_` : ""}\n\n${m.text}\n\n`)
+          .join("")
+      );
+    }
+    // txt
+    return (
+      `${title}\n\n` + messages.map((m) => `${m.role}${m.time ? ` (${m.time})` : ""}:\n${m.text}\n\n`).join("")
+    );
+  }
+
+  async function getTeileDirFromView(dir) {
+    for await (const e of dir.values()) {
+      if (e.kind === "directory" && e.name.startsWith("Teile_")) {
+        return await dir.getDirectoryHandle(e.name);
+      }
+    }
+    return null;
+  }
+
+  async function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  async function startBatchExport() {
+    try {
+      // Determine scope
+      const scope = (document.querySelector('input[name="batchScope"]:checked') || {}).value || "all";
+      const ext = (batchFormatSel.value || "html").toLowerCase();
+      const pack = (document.querySelector('input[name="batchPack"]:checked') || {}).value || "folder";
+
+      let rows = [];
+      if (scope === "current") {
+        if (!currentConvId) {
+          alert("Bitte zuerst einen Chat auswählen.");
+          return;
+        }
+        rows = [{ conversation_id: currentConvId, title: currentTitle, part_file: currentPart }];
+      } else if (scope === "filtered") {
+        const q = (listSearch.value || "").toLowerCase();
+        rows = indexRows.filter((r) => r.title.toLowerCase().includes(q) || r.conversation_id.toLowerCase().includes(q));
+      } else {
+        rows = indexRows.slice();
+      }
+
+      if (!rows.length) {
+        alert("Keine Chats zum Exportieren gefunden.");
+        return;
+      }
+
+      // Prepare directory or fallback
+      let targetDir = null;
+      if (pack === "folder") {
+        if (viewDirHandle) {
+          const aufb = await viewDirHandle.getDirectoryHandle("Aufbereitung");
+          const exportDir = await aufb.getDirectoryHandle("Exporte", { create: true });
+          const ts = new Date().toISOString().replace(/[:.]/g, "_");
+          targetDir = await exportDir.getDirectoryHandle(`BatchExport_${ts}`, { create: true });
+        } else if (typeof window.showDirectoryPicker === "function") {
+          try {
+            const d = await window.showDirectoryPicker();
+            const ts = new Date().toISOString().replace(/[:.]/g, "_");
+            targetDir = await d.getDirectoryHandle(`BatchExport_${ts}`, { create: true });
+          } catch (e) {
+            alert("Ordnerwahl abgebrochen. Fallback auf Einzel-Downloads.");
+          }
+        } else {
+          alert("Kein Ordnerzugriff verfügbar. Fallback auf Einzel-Downloads.");
+        }
+      }
+
+      batchProg.hidden = false;
+      batchProg.value = 0;
+      batchLog.innerHTML = '<div class="note">Statusliste:</div>';
+      batchCancelRequested = false;
+
+      // Find Teile dir (require for reading convs)
+      if (!viewDirHandle) {
+        // try to prompt user to select Aufbereitung folder if not set and pack requires it
+        if (pack === "folder") {
+          alert("Bitte den Aufbereitungs-Ordner (mit Teilen) wählen, um in Ordner zu speichern.");
+          return;
+        }
+      }
+
+      // For reads, use viewDirHandle (must be set). If not set, ask user to select.
+      if (!viewDirHandle) {
+        try {
+          const h = await window.showDirectoryPicker();
+          viewDirHandle = h;
+          await dbPut("viewDir", viewDirHandle);
+        } catch (e) {
+          // proceed: we may still support downloads using file reads if the user previously loaded the data
+        }
+      }
+
+      let teilDir = null;
+      if (viewDirHandle) teilDir = await getTeileDirFromView(viewDirHandle);
+      if (!teilDir) {
+        alert("Teile-Ordner nicht gefunden. Bitte Aufbereitungsordner wählen/öffnen.");
+        return;
+      }
+
+      const total = rows.length;
+      for (let i = 0; i < rows.length; i++) {
+        if (batchCancelRequested) break;
+        const r = rows[i];
+        const statusId = `status-${i}`;
+        const rowEl = document.createElement("div");
+        rowEl.id = statusId;
+        rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): queued`;
+        batchLog.appendChild(rowEl);
+
+        // attempt read and export
+        let success = false;
+        for (let attempt = 1; attempt <= 2 && !success && !batchCancelRequested; attempt++) {
+          try {
+            rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): reading (attempt ${attempt})`;
+            // Read part file
+            const fh = await teilDir.getFileHandle(r.part_file);
+            const txt = await readTextFile(fh);
+            const arr = JSON.parse(txt);
+            const conv = arr.find((o) => (o.id || "") === r.conversation_id);
+            if (!conv) {
+              rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): not found in part file`;
+              break; // no retry
+            }
+            const msgs = extractMessages(conv);
+            const content = generateContent(msgs, conv.title || "Unterhaltung", ext);
+            const nameBase = nameBaseFromTitle(conv.title || `chat_${r.conversation_id}`);
+            const filename = `${nameBase}.${ext}`;
+            rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): exporting`;
+
+            if (targetDir) {
+              await writeTextFile(targetDir, filename, content);
+            } else {
+              // fallback: trigger download
+              const blob = new Blob([content], { type: ext === "html" ? "text/html" : ext === "md" ? "text/markdown" : "text/plain" });
+              await downloadBlob(blob, filename);
+            }
+
+            rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): success`;
+            success = true;
+          } catch (e) {
+            console.error("Export error", e);
+            rowEl.textContent = `${i + 1}/${total} – ${r.title} (${r.conversation_id}): error (${e})`;
+            // slight delay before retry
+            await new Promise((res) => setTimeout(res, 400));
+          }
+        }
+        batchProg.value = Math.round(((i + 1) / total) * 100);
+      }
+
+      if (batchCancelRequested) {
+        batchLog.appendChild(document.createElement("div")).textContent = "Abgebrochen vom Nutzer.";
+      } else {
+        batchLog.appendChild(document.createElement("div")).textContent = "Export abgeschlossen.";
+      }
+
+    } catch (e) {
+      alert("Batch-Export fehlgeschlagen: " + e);
+    }
+  }
+
+  batchStart.addEventListener("click", () => {
+    startBatchExport();
   });
 </script>

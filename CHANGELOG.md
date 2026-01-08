@@ -2,6 +2,17 @@
 
 Alle relevanten Änderungen an diesem Projekt.
 
+## Unreleased – Batch Export (Added)
+
+### ✅ New Feature
+- **Batch Export**: Added a UI to export conversations in bulk (All / Filtered / Current). Supports client-side folder write via the File System Access API and a downloads fallback when folder access is unavailable.
+- **Progress & Retry**: Shows per-file status, an overall progress bar and simple retry for failed files.
+
+### ⚠️ Notes
+- Client folder-write requires Chrome/Edge (showDirectoryPicker). For very large exports consider server-side ZIP processing (not implemented in this patch).
+
+
+
 ## 0.2.1 – 2025-01-15 (P0 Bugfix Release)
 
 ### 🐛 Critical Bugfixes
